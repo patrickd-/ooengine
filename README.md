@@ -23,7 +23,8 @@ Crash course:
 Example:
 --------------------------------------
 
-```#!/bin/bash
+```shell
+#!/bin/bash
 source ooengine || exit 1
 
 # A simple base class named 'TestClass'.
@@ -102,14 +103,14 @@ Using libraries
 
 Use libraries by importing them:
 
-```#!/bin/bash
+```shell
 import String # (searches for $librarypath/String/String)
 import String/StringManipulation # (searches for $librarypath/String/StringManipulation)
 ```
 
 Use own library directories:
 
-```#!/bin/bash
+```shell
 add ./mylibraries
 import MyLibrary
 import MyLibrary/SubClass
