@@ -12,6 +12,7 @@ Features:
 5. Traits (multiple inheritance).
 6. Object cloning.
 7. Exceptions - throw and catch them.
+
 As intuitive as possible (it's still bash though).
 
 Crash course:
