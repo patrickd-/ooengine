@@ -102,13 +102,15 @@ Using libraries
 
 Use libraries by importing them:
 
-```import String # (searches for $librarypath/String/String)
+```#!/bin/bash
+import String # (searches for $librarypath/String/String)
 import String/StringManipulation # (searches for $librarypath/String/StringManipulation)
 ```
 
 Use own library directories:
 
-```add ./mylibraries
+```#!/bin/bash
+add ./mylibraries
 import MyLibrary
 import MyLibrary/SubClass
 ```
