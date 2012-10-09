@@ -5,12 +5,12 @@ Intuitive pseudo object orientation for bash (Shell Script)
 
 Features:
 --------------------------------------
-1. "Real classes" containing methods.
+1. "Classes" containing "methods".
 2. Created objects saved in variables.
 3. Public / private attributes.
 4. Inheritance (extending classes).
 5. Traits (multiple inheritance).
-6. Cloning of objects.
+6. Object cloning.
 7. Exceptions - throw and catch them.
 As intuitive as possible (it's still bash though).
 
@@ -21,6 +21,7 @@ Crash course:
 3. 'Objects' are created by calling new [Class name], save it's return value into a variable.
 
 Example:
+--------------------------------------
 
 ```#!/bin/bash
 source ooengine || exit 1
@@ -100,11 +101,13 @@ Using libraries
 --------------------------------------
 
 Use libraries by importing them:
+
 ```import String # (searches for $librarypath/String/String)
 import String/StringManipulation # (searches for $librarypath/String/StringManipulation)
 ```
 
 Use own library directories:
+
 ```add ./mylibraries
 import MyLibrary
 import MyLibrary/SubClass
