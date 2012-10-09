@@ -1,0 +1,28 @@
+##
+# 'Console' trait.
+#
+trait::Console() {
+
+  ##
+  # 'println' method.
+  # Prints text to console ending with newline.
+  method::println() {
+    if (( $# <= 1  )); then
+      printf "%s\n" "$@"
+    else
+      throw IllegalArgumentException "Too few arguments $#"
+    fi
+  }
+
+  ##
+  # 'println' method.
+  # Prints text to console.
+  method::print() {
+    if (( $# <= 1  )); then
+      printf "%s" "$@"
+    else
+      throw IllegalArgumentException "Too few arguments $#"
+    fi
+  }
+
+}

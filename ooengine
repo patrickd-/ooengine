@@ -1,0 +1,546 @@
+##
+# ooengine - Object oriented bash engine
+#
+# AUTHOR:   Patrick Drotleff <patrick.d@ventral.org>
+# USAGE:    source ./ooengine
+#           See ./examples/ for further documentation.
+
+##
+# Default 'Class' all other classes automatically extend from.
+class::Class() {
+
+  ##
+  # Standard attribute getter.
+  method::get() {
+    __attribute_get "$1"
+  }
+
+  ##
+  # Standard attribute setter.
+  method::set() {
+    __attribute_set "$1" "$2"
+  }
+
+  ##
+  # Default toString method.
+  method::toString() {
+    echo "$__OBJECT"
+  }
+
+  ##
+  # Default destructor.
+  method::destruct() {
+    __destruct
+  }
+
+  ##
+  # Standard clone method.
+  method::clone() {
+    __clone "$3"
+  }
+
+}
+
+##
+# Default 'Exception'.
+class::Exception() {
+
+  # Error message attribute.
+  public message
+
+  # The saved callstack.
+  public callStack
+
+  ##
+  # Default parameter setter.
+  method::setParameters() {
+    $this set message "$1"
+  }
+
+  ##
+  # Default toString method.
+  method::toString() {
+    local message=$($this get message)
+    echo "$__CLASS: $message"
+  }
+
+  ##
+  # Prints the exceptions callstack.
+  method::printStack() {
+    $this toString
+    $this get callStack
+  }
+
+}
+
+# Default exceptions.
+class::IllegalArgumentException::extends::Exception() { :; }
+class::UnknownLibraryException::extends::Exception() { :; }
+class::UndefinedMethodException::extends::Exception() { :; }
+class::UndefinedClassException::extends::Exception() { :; }
+class::UndefinedAttributeException::extends::Exception() { :; }
+class::ShellErrorException::extends::Exception() { :; }
+
+# Frame stack array, and pointer to the next position.
+# Contains object references in called order.
+declare -a __FRAME_STACK
+__FRAME_STACK_POINTER=0
+
+# Object and attributes value container.
+declare -A __OBJECTS
+
+# Array of library sources.
+declare -a __SOURCES=("./lib")
+
+# Array of current exception handlers.
+declare -A __EXCEPTION_HANDLERS
+__EXCEPTION_HANDLERS['Exception']="__default_exception_handler"
+trap "throw ShellErrorException 'A shell error occurred.'" ERR
+
+##
+# Adds a path as library source.
+add() {
+  __SOURCES=("$1" ${__SOURCES[@]})
+}
+
+##
+# Imports a given library.
+#
+# @param $1
+#  The library name to import.
+#  A simple "Name" will be included with Name/Name.
+#  A sublibrary "Name/SubName" will be included with Name/SubName.
+import() {
+  local sourcepath
+  local dirname=$(dirname $1)
+  local basename=$(basename $1)
+  if [[ $dirname == "." ]]; then
+    dirname=$basename
+  fi
+  for sourcepath in ${__SOURCES[@]}
+  do
+    if [[ -f "$sourcepath/$dirname/$basename" ]]; then
+      source "$sourcepath/$dirname/$basename"
+      return 0
+    fi
+  done
+  throw UnknownLibraryException "Could not find the requested library."
+}
+
+##
+# Returns a callable, new object reference.
+#
+# @param $1
+#  The Class name to construct the object of.
+new() {
+  echo "__call $1 $(date +%s%N)"
+}
+
+##
+# Executes the try() block and manage exception handlers.
+#
+# @param $1
+#  Name of the exception class to catch.
+# @param $2
+#  The exception handler function to pass the exception to.
+catch() {
+  if __function_exists "try"; then
+    # Save previous handler for this exception.
+    local old_handler=${__EXCEPTION_HANDLERS[$1]}
+    # Set new handler.
+    __EXCEPTION_HANDLERS[$1]=$2
+
+    # Try the try block.
+    try
+
+    # Restore previous handler for this exception.
+    __EXCEPTION_HANDLERS[$1]=$old_handler
+
+    # Remove previous try block.
+    unset -f try
+  else
+    throw Exception "No try block to execute found."
+  fi
+}
+
+##
+# Throws the given exception and calls the current handler.
+#
+# @param $1
+#  Name of the exception class to throw.
+throw() {
+  local exception_class=$1
+  shift 1
+
+  # Create and fill exception.
+  local exception=$(new $exception_class)
+  $exception set callStack "$(__call_stack)"
+  $exception setParameters "$@"
+
+  # Call the responsible handler.
+  local handler=${__EXCEPTION_HANDLERS[$exception_class]}
+  if [[ -n $handler ]]; then
+    $handler "$exception"
+  else
+    ${__EXCEPTION_HANDLERS[Exception]} "$exception"
+  fi
+}
+
+##
+# Calls a method of an object.
+#
+# @param $1
+#  The methods Class.
+# @param $2
+#  The object reference.
+# @param $3
+#  The methods name.
+__call() {
+  local class=$1
+  local object=$2
+  local method=$3
+  shift 3
+
+  # Save frame to stack.
+  __frame_push
+
+  # Enter the class.
+  __enter $class $object
+
+  # Call the method.
+  if __function_exists "method::$method"; then
+    method::$method "$@"
+  else
+    throw UndefinedMethodException "Method '$method' of class '$class' not defined."
+  fi
+
+  # Leave the class.
+  __leave
+
+  # Rebuild frame from stack.
+  __frame_pop
+}
+
+##
+# Handles inner parent calls through $parent.
+#
+# @param $1
+#  The objects parent Class.
+# @param $2
+#  The object reference.
+# @param $3
+#  The methods name.
+__parent_call() {
+  local base=$1
+  local object=$2
+  local method=$3
+  shift 3
+
+  # Save frame to stack.
+  __frame_push
+
+  # Enter the parent.
+  __enter $base $object
+
+  # Call the method.
+  __inner_call "$method" "$@"
+
+  # Leave the class.
+  __leave
+
+  # Rebuild frame from stack.
+  __frame_pop
+}
+
+##
+# Handles inner calls through $this.
+#
+# @param $1
+#  The methods name.
+__inner_call() {
+  local method=$1
+  shift 1
+  __INNERCALL=true
+  if __function_exists "method::$method"; then
+    # Public function call.
+    method::$method "$@"
+  elif __function_exists "__method::$method"; then
+    # Private function call.
+    __method::$method "$@"
+  else
+    throw UndefinedMethodException "Method '$method' of class '$class' not defined."
+  fi
+  __INNERCALL=false
+}
+
+##
+# Enters (sets up methods and attributes of) an object.
+#
+# @param $1
+#  The methods Class.
+# @param $2
+#  The object reference.
+__enter() {
+  # Set inner globals.
+  __CLASS=$1
+  __OBJECT=$2
+  __ATTRIBUTES=()
+
+  # Attribute discovery.
+  private() { __attribute_init $__OBJECT "$1" "private" "$2"; }
+  public() { __attribute_init $__OBJECT "$1" "public" "$2"; }
+
+  # Get the base class.
+  local class_function=$(__get_functions "class::$__CLASS::extends::*")
+  __BASE=${class_function:$((${#__CLASS} + 18))}
+
+  # All base classes automatically extend from 'Class'.
+  __resolve "class" "Class"
+  if [[ -z $__BASE && $__CLASS != "Class" ]]; then
+    __BASE="Class"
+  fi
+
+  # Provide trait resolving function.
+  use() { __resolve "trait" "$1"; }
+
+  # Resolve the target class.
+  __resolve "class" $__CLASS $__BASE
+
+  # Set $this and $parent.
+  this="__inner_call"
+  parent="__parent_call $__BASE $__OBJECT"
+
+  unset -f use
+  unset -f private
+  unset -f public
+}
+
+##
+# Resolves extensions, decorations of a construct. 
+#
+# @param $1
+#  Construct type.
+# @param $2
+#  Construct name.
+# @param $3
+#  Optional base name.
+__resolve() {
+  local type=$1
+  local name=$2
+  local base=$3
+
+  # Get the function.
+  local function="$(__get_functions "$type::$name")"
+  if [[ -z $function ]]; then
+    function="$(__get_functions "$type::$name::extends::*")"
+  fi
+
+  # Get the base.
+  if [[ -z $base ]]; then
+    base=${function:$((${#type} + ${#name} + 13))}
+  fi
+
+  # Resolve the base.
+  if [[ -n $base ]]; then
+    __resolve $type $base
+  fi
+
+  # Call class function.
+  if __function_exists "$function"; then
+    $function
+  else
+    __leave
+    throw UndefinedClassException "Class ($type) '$name' not defined."
+  fi
+
+  # Search and resolve decorator classes.
+  $(__get_functions "*::decorates::$name")
+}
+
+##
+# Leaves an entered class
+__leave() {
+  # Remove methods.
+  unset -f $(__get_functions "method::*")
+
+  # Remove inner globals.
+  unset __CLASS
+  unset __OBJECT
+  unset __BASE
+  unset __ATTRIBUTES
+  unset this
+  unset parent
+}
+
+##
+# Handles object destruction.
+__destruct() {
+  # Unset all attributes.
+  local attribute
+  local attribute_info
+  for attribute in ${__ATTRIBUTES[@]}; do
+    attribute_info=(${attribute/:/ })
+    unset __OBJECTS["$__OBJECT,${attribute_info[1]},${attribute_info[0]}"]
+  done
+}
+
+##
+# Clones an object to an existing reference.
+#
+# @param $1
+#  The clones object reference.
+__clone() {
+  local object=$1
+  if [[ -z $object || "$object" != ?(+|-)+([0-9]) ]]; then
+    throw IllegalArgumentException "Expected object reference, '$object' given."
+  fi
+  # Copy all attributes.
+  local attribute
+  local attribute_info
+  for attribute in ${__ATTRIBUTES[@]}; do
+    attribute_info=(${attribute/:/ })
+    __OBJECTS["$object,${attribute_info[1]},${attribute_info[0]}"]=${__OBJECTS[$__OBJECT,${attribute_info[1]},${attribute_info[0]}]}
+  done
+}
+
+##
+# Default exception handler.
+#
+# @param $1
+__default_exception_handler() {
+  # Print error message with call stack.
+  $exception printStack
+  # Exit with failure.
+  exit 1
+}
+
+##
+# Saves the current frame to stack.
+__frame_push() {
+  if [[ -n $__CLASS ]]; then
+    # Push frame to stack.
+    __FRAME_STACK[$__FRAME_STACK_POINTER]="__enter $__CLASS $__OBJECT"
+    let __FRAME_STACK_POINTER+=1
+    # Leave current object.
+    __leave
+  fi
+}
+
+##
+# Reenters the pervious frame from stack.
+__frame_pop() {
+  if [[ $__FRAME_STACK_POINTER -gt 0 ]]; then
+    # Get frame from stack.
+    let __FRAME_STACK_POINTER-=1
+    # Reenter previous object.
+    ${__FRAME_STACK[$__FRAME_STACK_POINTER]}
+    unset __FRAME_STACK[$__FRAME_STACK_POINTER]
+  fi
+}
+
+##
+# Initializes an attribute.
+#
+# @param $1
+#  The object reference.
+# @param $2
+#  The attribute name.
+# @param $3
+#  The attribute type.
+# @param $4
+#  The default value.
+__attribute_init() {
+  # Add attribute to list.
+  __ATTRIBUTES=(${__ATTRIBUTES[@]} "$3:$2")
+  # Save default value.
+  if [[ -z ${__OBJECTS["$1,$2,$3"]} ]]; then
+    if [[ -n $4 ]]; then
+      __OBJECTS["$1,$2,$3"]="$4"
+    else
+      __OBJECTS["$1,$2,$3"]="<<[NONE]>>"
+    fi
+  fi
+}
+
+##
+# Sets the value of an attribute.
+#
+# @param $1
+#  The attribute name.
+# @param $2
+#  The value to set.
+__attribute_set() {
+  local type
+  if [[ -n ${__OBJECTS["$__OBJECT,$1,public"]} ]]; then
+    type="public"
+  else
+    if [[ -n ${__OBJECTS["$__OBJECT,$1,private"]} && $__INNERCALL == true ]]; then
+      type="private"
+    fi
+  fi
+  if [[ -n $type ]]; then
+    if [[ -n $2 ]]; then
+      __OBJECTS["$__OBJECT,$1,$type"]=$2
+    else
+      __OBJECTS["$__OBJECT,$1,$type"]="<<[NONE]>>"
+    fi
+  else
+    throw UndefinedAttributeException "Attribute '$1' not defined."
+  fi
+}
+
+##
+# Gets the value of an attribute.
+#
+# @param $1
+#  The attribute name.
+__attribute_get() {
+  local value
+  if [[ -n ${__OBJECTS["$__OBJECT,$1,public"]} ]]; then
+    value=${__OBJECTS["$__OBJECT,$1,public"]}
+  else
+    if [[ -n ${__OBJECTS["$__OBJECT,$1,private"]} && $__INNERCALL == true ]]; then
+      value=${__OBJECTS["$__OBJECT,$1,private"]}
+    else
+      throw UndefinedAttributeException "Attribute '$1' not defined."
+    fi
+  fi
+  if [[ $value != "<<[NONE]>>" && -n $value ]]; then
+    echo "$value"
+  fi
+}
+
+##
+# Checks whether a function exists.
+#
+# @param $1
+#  The function name.
+__function_exists() {
+  if [[ -n $(type -t "$1") ]]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+##
+# Returns the current call stack.
+__call_stack() {
+  local frames=${#BASH_LINENO[@]}
+  local frame=0
+  for ((frame=frames-2; frame>=0; frame--)); do
+    local base_source=${BASH_SOURCE[frame+1]}
+    if [[ $(basename $base_source) != "ooengine" ]]; then
+      printf "  %-20s :%s \t %25s \n" "${BASH_SOURCE[frame+1]}" "${BASH_LINENO[frame]}" "${FUNCNAME[frame+1]}"
+    fi
+  done
+}
+
+##
+# Returns a list of existing functions by pattern.
+#
+# @param $1
+#  The pattern to match the name with.
+__get_functions() {
+  compgen -A function -X \!$1
+}

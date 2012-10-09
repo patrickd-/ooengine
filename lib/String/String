@@ -1,0 +1,73 @@
+import Console
+
+##
+# 'String' class.
+#
+class::String() {
+
+  use Console
+
+  # The string itself.
+  public string ""
+
+  ##
+  # Overrides the default 'set' method.
+  #
+  # String is the only attribute, so always set the string.
+  #
+  # @param $1
+  #  The string to set.
+  method::set() {
+    $parent set string "$1"
+  }
+
+  ##
+  # Overrides the default 'get' method.
+  #
+  # String is the only attribute, so only return the string.
+  #
+  # @return
+  #  The string.
+  method::get() {
+    $parent get string
+  }
+
+  ##
+  # 'toString' method.
+  #
+  # Returns the string itself.
+  #
+  # @return
+  #  The string.
+  method::toString() {
+    $this get
+  }
+
+  ##
+  # 'length' method.
+  #
+  # Returns the length of the string.
+  #
+  # @return
+  #  The strings length
+  method::length() {
+    local string=$($this toString)
+    $this println "${#string}"
+  }
+
+  ##
+  # 'isEmpty' method.
+  #
+  # Returns whether the string is empty.
+  #
+  # @return
+  #  Whether the string is empty.
+  method::isEmpty() {
+    if (( $($this length) == 0 )); then
+      $this println true
+    else
+      $this println false
+    fi
+  }
+
+}
