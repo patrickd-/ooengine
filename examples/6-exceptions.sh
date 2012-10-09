@@ -21,7 +21,7 @@ class::fooClass() {
 # A custom exception handler.
 exceptionHandler() {
   # Print error message with call stack.
-  $exception printStack
+  $exception printStack 1>&2
   # Exiting with failure, is what the default handler would do.
   # exit 1
 }

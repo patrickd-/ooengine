@@ -409,7 +409,7 @@ __clone() {
 # @param $1
 __default_exception_handler() {
   # Print error message with call stack.
-  $exception printStack
+  $exception printStack 1>&2
   # Exit with failure.
   exit 1
 }
