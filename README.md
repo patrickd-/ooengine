@@ -6,8 +6,8 @@ Intuitive pseudo object orientation for bash (Shell Script)
 Project maintainance:
 --------------------------------------
 This was more of an experiment whether I can get some of OO greatness into bash scripts.
-I'm not plannign to continue any of it at the moment.
-But feel free to fork this if you are interested!
+I'm not planning to continue any of it at the moment.
+But feel free to fork it if you are interested!
 
 
 Features:
