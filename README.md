@@ -3,6 +3,13 @@ ooengine
 
 Intuitive pseudo object orientation for bash (Shell Script)
 
+Project maintainance:
+--------------------------------------
+This was more of an experiment whether I can get some of OO greatness into bash scripts.
+I'm not plannign to continue any of it at the moment.
+But feel free to fork this if you are interested!
+
+
 Features:
 --------------------------------------
 1. "Classes" containing "methods".
@@ -95,9 +102,9 @@ Packed libraries
 --------------------------------------
 - Console (Incomplete) - Console/IO help functions.
 - String (Incomplete) - String class.
-- Array (Planned)
-- MySQL (Planned)
-- ... (Planned)
+- Array (Incomplete)
+- MySQL (Incomplete)
+- ...
 
 Using libraries
 --------------------------------------
